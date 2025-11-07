@@ -209,7 +209,7 @@ class FrameBuilder(
     fun muxAudioFrames(): Boolean {
         if (audioExtractor == null) {
             if (VERBOSE) Log.d(TAG, "Audio extractor not available")
-            return
+            return true
         }
         val sampleSize = 256 * 1024
         val offset = 100
