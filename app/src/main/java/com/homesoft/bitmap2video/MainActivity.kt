@@ -83,8 +83,12 @@ class MainActivity : AppCompatActivity() {
 
         binding.btPlay.setOnClickListener {
             videoFile?.run {
-                binding.player.setVideoPath(this.absolutePath)
-                binding.player.start()
+                try {
+                    binding.player.setVideoPath(this.absolutePath)
+                    binding.player.start()
+                } catch (e: IllegalStateException) {
+                    e.printStackTrace()
+                }
             }
         }
 
@@ -113,7 +117,7 @@ class MainActivity : AppCompatActivity() {
             muxerConfig = MuxerConfig(this, 600, 600, mimeType, 3, 1F, 1500000)
             val muxer = Muxer(this@MainActivity, muxerConfig!!)
 
-            createVideo(muxer) // using callbacks
+            //createVideo(muxer) // using callbacks
             // or
             createVideoAsync(muxer) // using co-routines
         }
@@ -128,7 +132,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onVideoError(error: Throwable) {
-                Log.e(TAG, "There was an error muxing the video")
+                Log.e(TAG, "There was an error muxing the video", error)
                 onMuxerCompleted()
             }
         })

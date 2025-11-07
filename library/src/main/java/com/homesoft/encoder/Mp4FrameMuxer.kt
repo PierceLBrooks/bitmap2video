@@ -55,8 +55,13 @@ class Mp4FrameMuxer(path: String, private val fps: Float) : FrameMuxer {
             Log.e("Audio format: %s", audioFormat.toString())
         }
         Log.d("Video format: %s", videoFormat.toString())
-        muxer.start()
-        started = true
+        try {
+            muxer.start()
+            started = true
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Start Muxer Failed")
+            e.printStackTrace()
+        }
     }
 
     override fun muxVideoFrame(encodedData: ByteBuffer, bufferInfo: MediaCodec.BufferInfo) {
@@ -66,16 +71,31 @@ class Mp4FrameMuxer(path: String, private val fps: Float) : FrameMuxer {
         finalVideoTime = frameUsec * videoFrames++
         bufferInfo.presentationTimeUs = finalVideoTime
 
-        muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo)
+        try {
+            muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo)
+        } catch (e: IllegalStateException) {
+            e.printStackTrace()
+            throw RuntimeException("Write Muxer Video Failed")
+        }
     }
 
     override fun muxAudioFrame(encodedData: ByteBuffer, audioBufferInfo: MediaCodec.BufferInfo) {
-        muxer.writeSampleData(audioTrackIndex, encodedData, audioBufferInfo)
+        try {
+            muxer.writeSampleData(audioTrackIndex, encodedData, audioBufferInfo)
+        } catch (e: IllegalStateException) {
+            e.printStackTrace()
+            throw RuntimeException("Write Muxer Audio Failed")
+        }
     }
 
     override fun release() {
-        muxer.stop()
-        muxer.release()
+        try {
+            muxer.stop()
+            muxer.release()
+        } catch (e: IllegalStateException) {
+            e.printStackTrace()
+            throw RuntimeException("Release Muxer Failed")
+        }
     }
 
     override fun getVideoTime(): Long {

@@ -206,12 +206,13 @@ class FrameBuilder(
         }
     }
 
-    fun muxAudioFrames() {
+    fun muxAudioFrames(): Boolean {
         val sampleSize = 256 * 1024
         val offset = 100
         val audioBuffer = ByteBuffer.allocate(sampleSize)
         val audioBufferInfo = MediaCodec.BufferInfo()
         var sawEOS = false
+        var success = true
         audioExtractor!!.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
         var finalAudioTime: Long
         val finalVideoTime: Long = frameMuxer.getVideoTime()
@@ -227,7 +228,13 @@ class FrameBuilder(
                 finalAudioTime = audioExtractor!!.sampleTime
                 audioBufferInfo.presentationTimeUs = finalAudioTime
                 audioBufferInfo.flags = audioExtractor!!.sampleFlags
-                frameMuxer.muxAudioFrame(audioBuffer, audioBufferInfo)
+                try {
+                    frameMuxer.muxAudioFrame(audioBuffer, audioBufferInfo)
+                } catch (e: RuntimeException) {
+                    e.printStackTrace()
+                    success = false
+                    break
+                }
                 audioExtractor!!.advance()
                 audioTrackFrameCount++
                 if (VERBOSE) Log.d(TAG, "Frame ($audioTrackFrameCount Flags: ${audioBufferInfo.flags} Size(KB): ${audioBufferInfo.size / 1024}")
@@ -239,27 +246,54 @@ class FrameBuilder(
                 }
             }
         }
+        return success
     }
 
     /**
      * Releases encoder resources.  May be called after partial / failed initialization.
      */
-    fun releaseVideoCodec() {
+    fun releaseVideoCodec(): Boolean {
         // Release the video layer
+        var success = true
         if (VERBOSE) Log.d(TAG, "releasing encoder objects")
-        drainCodec(true)
-        mediaCodec.stop()
-        mediaCodec.release()
+        try {
+            drainCodec(true)
+        } catch (e: RuntimeException) {
+            e.printStackTrace()
+            success = false
+        }
+        try {
+            mediaCodec.stop()
+            mediaCodec.release()
+        } catch (e: IllegalStateException) {
+            e.printStackTrace()
+            success = false
+        }
         surface?.release()
+        return success
     }
 
-    fun releaseAudioExtractor() {
-        audioExtractor?.release()
+    fun releaseAudioExtractor(): Boolean {
+        var success = true
+        try {
+            audioExtractor?.release()
+        } catch (e: IllegalStateException) {
+            e.printStackTrace()
+            success = false
+        }
+        return success
     }
 
-    fun releaseMuxer() {
+    fun releaseMuxer(): Boolean {
         // Release MediaMuxer
-        frameMuxer.release()
+        var success = true
+        try {
+            frameMuxer.release()
+        } catch (e: RuntimeException) {
+            e.printStackTrace()
+            success = false
+        }
+        return success
     }
 
 }

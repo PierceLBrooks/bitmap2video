@@ -60,6 +60,7 @@ class Muxer(private val context: Context, private val file: File) {
             @RawRes audioTrack: Int? = null): MuxingResult {
         // Returns on a callback a finished video
         Log.d(TAG, "Generating video")
+        var success = true
         val frameBuilder = FrameBuilder(context, muxerConfig, audioTrack)
 
         try {
@@ -72,19 +73,30 @@ class Muxer(private val context: Context, private val file: File) {
         }
 
         for (image in imageList) {
-            frameBuilder.createFrame(image)
+            try {
+                frameBuilder.createFrame(image)
+            } catch (e: RuntimeException) {
+                e.printStackTrace()
+                success = false
+                break
+            }
         }
 
         // Release the video codec so we can mux in the audio frames separately
-        frameBuilder.releaseVideoCodec()
+        success = frameBuilder.releaseVideoCodec() && success
 
         // Add audio
-        frameBuilder.muxAudioFrames()
+        success = frameBuilder.muxAudioFrames() && success
 
         // Release everything
-        frameBuilder.releaseAudioExtractor()
-        frameBuilder.releaseMuxer()
+        success = frameBuilder.releaseAudioExtractor() && success
+        success = frameBuilder.releaseMuxer() && success
 
+        if (!success) {
+            val thrown = RuntimeException("Muxer Muxing Failed")
+            muxingCompletionListener?.onVideoError(thrown)
+            return MuxingError(thrown.message.toString(), thrown)
+        }
         muxingCompletionListener?.onVideoSuccessful(file)
         return MuxingSuccess(file)
     }
