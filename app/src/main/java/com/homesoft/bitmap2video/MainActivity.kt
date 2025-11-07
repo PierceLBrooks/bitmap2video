@@ -8,10 +8,11 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.homesoft.bitmap2video.FileUtils.getVideoFile
 import com.homesoft.bitmap2video.FileUtils.shareVideo
+import com.homesoft.bitmap2video.databinding.ActivityMainBinding
 import com.homesoft.encoder.*
-import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,14 +36,15 @@ import java.io.File
 
 class MainActivity : AppCompatActivity() {
     companion object {
-        val TAG = MainActivity::class.java.simpleName
-        val imageArray: List<Int> = listOf(
+        private val TAG: String = MainActivity::class.java.simpleName
+        private val imageArray: List<Int> = listOf(
                 R.raw.im1,
                 R.raw.im2,
                 R.raw.im3,
                 R.raw.im4
         )
     }
+    private lateinit var binding: ActivityMainBinding
 
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
     private var videoFile: File? = null
@@ -51,9 +53,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        avc.isEnabled = isCodecSupported(mimeType)
+        binding.avc.isEnabled = isCodecSupported(mimeType)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
                 checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -64,28 +67,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setListeners() {
-        bt_make.setOnClickListener {
-            bt_make.isEnabled = false
+        binding.btMake.setOnClickListener {
+            binding.btMake.isEnabled = false
 
             basicVideoCreation()
         }
 
-        avc.setOnCheckedChangeListener { _, isChecked ->
+        binding.avc.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) setCodec(MediaFormat.MIMETYPE_VIDEO_AVC)
         }
 
-        hevc.setOnCheckedChangeListener { _, isChecked ->
+        binding.hevc.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) setCodec(MediaFormat.MIMETYPE_VIDEO_HEVC)
         }
 
-        bt_play.setOnClickListener {
+        binding.btPlay.setOnClickListener {
             videoFile?.run {
-                player.setVideoPath(this.absolutePath)
-                player.start()
+                binding.player.setVideoPath(this.absolutePath)
+                binding.player.start()
             }
         }
 
-        bt_share.setOnClickListener {
+        binding.btShare.setOnClickListener {
             Log.i(TAG, "Sharing video...")
             muxerConfig?.run {
                 shareVideo(this@MainActivity, file, mimeType)
@@ -131,9 +134,9 @@ class MainActivity : AppCompatActivity() {
         })
 
         // Needs to happen on a background thread (long-running process)
-        Thread(Runnable {
+        lifecycleScope.launch(Dispatchers.IO) {
             muxer.mux(imageArray, R.raw.bensound_happyrock)
-        }).start()
+        }
     }
 
     // Coroutine approach
@@ -146,7 +149,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 is MuxingError -> {
                     Log.e(TAG, "There was an error muxing the video")
-                    bt_make.isEnabled = true
+                    binding.btMake.isEnabled = true
                 }
             }
         }
@@ -154,9 +157,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun onMuxerCompleted() {
         runOnUiThread {
-            bt_make.isEnabled = true
-            bt_play.isEnabled = true
-            bt_share.isEnabled = true
+            binding.btMake.isEnabled = true
+            binding.btPlay.isEnabled = true
+            binding.btShare.isEnabled = true
         }
     }
 }
