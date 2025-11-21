@@ -3,6 +3,7 @@ package com.homesoft.bitmap2video
 import android.content.Context
 import android.content.Intent
 import android.content.res.AssetFileDescriptor
+import android.os.Environment
 import android.util.Log
 import androidx.annotation.RawRes
 import androidx.core.content.FileProvider
@@ -49,7 +50,7 @@ object FileUtils {
      * @return - created file object at media/fileName
      */
     fun getVideoFile(context: Context, fileName: String): File {
-        return getVideoFile(context, MEDIA_FILE_PATH, fileName)
+        return getVideoFile(context, Environment.getExternalStorageDirectory(), fileName)
     }
 
     /**
@@ -63,13 +64,10 @@ object FileUtils {
      * @param fileName - name of the file
      * @return - created file object at fileDir/fileName
      */
-    fun getVideoFile(context: Context, fileDir: String,
+    fun getVideoFile(context: Context, fileDir: File,
                      fileName: String): File {
-        val mediaFolder = File(context.filesDir, fileDir)
-        // Create the directory if it does not exist
-        if (!mediaFolder.exists()) mediaFolder.mkdirs()
-        Log.d(TAG, "Got folder at: " + mediaFolder.absolutePath)
-        val file = File(mediaFolder, fileName)
+        Log.d(TAG, "Got folder at: " + fileDir.absolutePath)
+        val file = File(fileDir, fileName)
         Log.d(TAG, "Got file at: " + file.absolutePath)
         return file
     }

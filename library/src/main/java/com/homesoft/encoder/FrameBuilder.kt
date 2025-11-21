@@ -12,6 +12,7 @@ import android.os.Build
 import android.util.Log
 import android.view.Surface
 import androidx.annotation.RawRes
+import androidx.core.graphics.scale
 import java.io.IOException
 import java.nio.ByteBuffer
 
@@ -121,7 +122,12 @@ class FrameBuilder(
      * @param canvas acquired from createCanvas()
      */
     private fun drawBitmapAndPostCanvas(bitmap: Bitmap, canvas: Canvas?) {
-        canvas?.drawBitmap(bitmap, 0f, 0f, null)
+        val scale = if (muxerConfig.videoWidth != bitmap.width || muxerConfig.videoHeight != bitmap.height) {
+            bitmap.scale(muxerConfig.videoWidth, muxerConfig.videoHeight)
+        } else {
+            bitmap
+        }
+        canvas?.drawBitmap(scale, 0f, 0f, null)
         postCanvasFrame(canvas)
     }
 

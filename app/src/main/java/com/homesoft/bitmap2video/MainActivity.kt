@@ -1,13 +1,21 @@
 package com.homesoft.bitmap2video
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaFormat
+import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.homesoft.bitmap2video.FileUtils.getVideoFile
 import com.homesoft.bitmap2video.FileUtils.shareVideo
@@ -58,12 +66,24 @@ class MainActivity : AppCompatActivity() {
 
         binding.avc.isEnabled = isCodecSupported(mimeType)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1234)
-        }
-
         setListeners()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Environment.isExternalStorageManager()) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1234)
+                }
+            } else {
+                startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, ("package:$packageName").toUri()));
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1234)
+            }
+        }
     }
 
     private fun setListeners() {
@@ -98,6 +118,13 @@ class MainActivity : AppCompatActivity() {
                 shareVideo(this@MainActivity, file, mimeType)
             }
         }
+
+        binding.player.setOnInfoListener { mp, what, extra ->
+            if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                Log.i(TAG, "Video dimensions ${mp.videoWidth}x${mp.videoHeight}")
+            }
+            false
+        }
     }
 
     private fun setCodec(codec: String) {
@@ -114,7 +141,7 @@ class MainActivity : AppCompatActivity() {
     private fun basicVideoCreation() {
         videoFile = getVideoFile(this@MainActivity, "test.mp4")
         videoFile?.run {
-            muxerConfig = MuxerConfig(this, 600, 600, mimeType, 3, 1F, 1500000)
+            muxerConfig = MuxerConfig(this, 0, 0, mimeType, 3, 1F, 1500000)
             val muxer = Muxer(this@MainActivity, muxerConfig!!)
 
             //createVideo(muxer) // using callbacks

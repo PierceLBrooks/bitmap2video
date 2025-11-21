@@ -2,7 +2,9 @@ package com.homesoft.encoder
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Point
 import android.media.MediaCodecList
 import android.media.MediaCodecList.REGULAR_CODECS
 import android.util.Log
@@ -11,6 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import java.io.File
 import java.io.IOException
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 /*
  * Copyright (C) 2020 Israel Flores
@@ -58,9 +62,76 @@ class Muxer(private val context: Context, private val file: File) {
      */
     fun mux(imageList: List<Any>,
             @RawRes audioTrack: Int? = null): MuxingResult {
+        if (!isCodecSupported(muxerConfig.mimeType)) {
+            val thrown = RuntimeException("Unsupported Muxer Mime Type")
+            muxingCompletionListener?.onVideoError(thrown)
+            return MuxingError(thrown.message.toString(), thrown)
+        }
+
         // Returns on a callback a finished video
         Log.d(TAG, "Generating video")
         var success = true
+        if (muxerConfig.videoWidth == 0 || muxerConfig.videoHeight == 0) {
+            var width = 0
+            var height = 0
+            for (image in imageList) {
+                val size = when (image) {
+                    is Int -> {
+                        val bitmap = BitmapFactory.decodeResource(context.resources, image)
+                        Point(bitmap.width, bitmap.height)
+                    }
+                    is Bitmap -> Point(image.width, image.height)
+                    is Canvas -> Point(image.width, image.height)
+                    else -> continue
+                }
+                if (size.x > width) {
+                    width = size.x
+                }
+                if (size.y > height) {
+                    height = size.y
+                }
+            }
+            val size = Point(width, height)
+            val codecs = MediaCodecList(REGULAR_CODECS)
+            var threshold = Double.MAX_VALUE
+            for (info in codecs.codecInfos) {
+                if (!info.isEncoder) {
+                    continue
+                }
+                for (type in info.supportedTypes) {
+                    if (type == muxerConfig.mimeType) {
+                        val codecCapabilities = info.getCapabilitiesForType(type)
+                        val videoCapabilities = codecCapabilities.videoCapabilities
+                        val widthAlignment = videoCapabilities.widthAlignment
+                        val heightAlignment = videoCapabilities.heightAlignment
+                        val widthRange = videoCapabilities.supportedWidths
+                        for (x in widthRange.lower until widthRange.upper + 1 step 2) {
+                            if (x % widthAlignment != 0) {
+                                continue
+                            }
+                            val heightRange = videoCapabilities.getSupportedHeightsFor(x)
+                            for (y in heightRange.lower until heightRange.upper + 1 step 2) {
+                                if (y % heightAlignment != 0) {
+                                    continue
+                                }
+                                if (videoCapabilities.isSizeSupported(x, y)) {
+                                    val point = Point(x, y)
+                                    val temp = distance(size, point)
+                                    if (temp < threshold) {
+                                        width = x
+                                        height = y
+                                        threshold = temp
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Log.d(TAG, "Video dimensions ${width}x${height}")
+            muxerConfig.videoWidth = width
+            muxerConfig.videoHeight = height
+        }
         val frameBuilder = FrameBuilder(context, muxerConfig, audioTrack)
 
         try {
@@ -121,4 +192,8 @@ fun isCodecSupported(mimeType: String?): Boolean {
         }
     }
     return false
+}
+
+fun distance(from: Point, to: Point): Double {
+    return sqrt((from.x - to.x).toDouble().pow(2.0) + (from.y - to.y).toDouble().pow(2.0))
 }
